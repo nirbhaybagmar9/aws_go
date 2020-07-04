@@ -44,6 +44,7 @@ func GetInstances() http.Handler {
 				w.WriteHeader(http.StatusInternalServerError)
 
 			} else {
+				fmt.Println(result)
 				var Instances []Instance = make([]Instance, 0)
 				for idx := range result.Reservations {
 					for _, inst := range result.Reservations[idx].Instances {

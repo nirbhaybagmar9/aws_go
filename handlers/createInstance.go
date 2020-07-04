@@ -14,10 +14,9 @@ import (
 
 //VM
 type VM struct {
-	ImageID  string `json:"imageId"`
-	Region   string `json:"region"`
-	TagKey   string `json:"tagKey"`
-	TagValue string `json:"tagValue"`
+	ImageID string   `json:"imageId"`
+	Region  string   `json:"region"`
+	Name    []string `json:"name"`
 }
 
 //CreateInstance : http.MethodPost.
@@ -42,53 +41,54 @@ func CreateInstance() http.Handler {
 			if err != nil {
 				panic(err)
 			}
-			sess, err := session.NewSession(&aws.Config{
+			sess, _ := session.NewSession(&aws.Config{
 				Region: aws.String(inst.Region)},
 			)
-			if err != nil {
-				fmt.Println(err)
-			}
-			fmt.Println(inst)
 			// Create EC2 service client
 			svc := ec2.New(sess)
 
+			for _, value := range inst.Name {
+				go func(val string) {
+					runResult, err := svc.RunInstances(&ec2.RunInstancesInput{
+						// An Amazon Linux AMI ID for t2.micro instances in the us-west-2 region
+						ImageId:      aws.String(inst.ImageID),
+						InstanceType: aws.String("t2.micro"),
+						MinCount:     aws.Int64(1),
+						MaxCount:     aws.Int64(1),
+					})
+
+					if err != nil {
+						http.Error(w, "Could not create instance", http.StatusInternalServerError)
+						fmt.Println("Could not create instance", err)
+						return
+					}
+
+					fmt.Println(*runResult.Instances[0])
+
+					// Add tags to the created instance
+					_, errtag := svc.CreateTags(&ec2.CreateTagsInput{
+						Resources: []*string{runResult.Instances[0].InstanceId},
+						Tags: []*ec2.Tag{
+							{
+								Key:   aws.String("Name"),
+								Value: aws.String(val),
+							},
+						},
+					})
+					if errtag != nil {
+						http.Error(w, "Could not create tags", http.StatusInternalServerError)
+						log.Println("Could not create tags for instance", runResult.Instances[0].InstanceId, errtag)
+						return
+					}
+					w.WriteHeader(http.StatusOK)
+					values := map[string]string{"imageId": *runResult.Instances[0].InstanceId}
+					jsonValue, _ := json.Marshal(values)
+					w.Write(jsonValue)
+					fmt.Println("Successfully tagged instance")
+				}(value)
+			}
 			// Specify the details of the instance that you want to create.
-			runResult, err := svc.RunInstances(&ec2.RunInstancesInput{
-				// An Amazon Linux AMI ID for t2.micro instances in the us-west-2 region
-				ImageId:      aws.String(inst.ImageID),
-				InstanceType: aws.String("t2.micro"),
-				MinCount:     aws.Int64(1),
-				MaxCount:     aws.Int64(1),
-			})
 
-			if err != nil {
-				http.Error(w, "Could not create instance", http.StatusInternalServerError)
-				fmt.Println("Could not create instance", err)
-				return
-			}
-
-			fmt.Println("Created instance", *runResult.Instances[0].InstanceId)
-
-			// Add tags to the created instance
-			_, errtag := svc.CreateTags(&ec2.CreateTagsInput{
-				Resources: []*string{runResult.Instances[0].InstanceId},
-				Tags: []*ec2.Tag{
-					{
-						Key:   aws.String(inst.TagKey),
-						Value: aws.String(inst.TagValue),
-					},
-				},
-			})
-			if errtag != nil {
-				http.Error(w, "Could not create tags", http.StatusInternalServerError)
-				log.Println("Could not create tags for instance", runResult.Instances[0].InstanceId, errtag)
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-			values := map[string]string{"imageId": *runResult.Instances[0].InstanceId}
-			jsonValue, _ := json.Marshal(values)
-			w.Write(jsonValue)
-			fmt.Println("Successfully tagged instance")
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}

@@ -2,6 +2,8 @@ import React, { Component } from 'react'
 import {Form, Button} from 'react-bootstrap'
 import '../Styles/form-style.css'
 import axios from 'axios'
+import {Alert} from 'react-bootstrap';
+
 export class Forms extends Component {
     constructor(props) {
         super(props)
@@ -9,32 +11,29 @@ export class Forms extends Component {
             validated: false
         }
         this.imageId = React.createRef(); 
-        this.tagKey = React.createRef(); 
-        this.tagValue = React.createRef(); 
         this.region = React.createRef(); 
-
+        this.name = React.createRef();
      }
     async createInstance () {
         await axios.post('http://localhost:8080/create', {
             imageId: this.imageId.current.value,
             region: this.region.current.value,
-            tagKey: this.tagKey.current.value,
-            tagValue: this.tagValue.current.value
-        }).then(res => console.log(res)).catch(err => console.log(err))
+            name: [this.name.current.value],
+        }).then(res => {
+          console.log('Called');
+        }).catch(err => console.log(err))
     }
     handleSubmit (event) {
-        const value = this.imageId.current.value
-        console.log(value)
         const form = event.currentTarget;
-        console.log(event.target)
+        event.preventDefault();
+
         if (form.checkValidity() === false) {
-          event.preventDefault();
           event.stopPropagation();
-        }
-        this.setState({
-            validated: true
-        }, () => this.createInstance())
-        event.stopPropagation();
+          event.preventDefault();
+          return
+        } 
+       this.createInstance();
+        return false;
       };
     render() {
         const region = [
@@ -54,7 +53,7 @@ export class Forms extends Component {
         return (
             <div className="form-container">
             <h2 className="h2">Create Instance</h2>
-            <Form className="align-items-center" noValidate validated={this.state.validated} onSubmit={this.handleSubmit.bind(this)}>
+            <Form className="align-items-center" noValidate validated={this.state.validated}>
                 <Form.Group controlId="exampleForm.ControlSelect1">
                     <Form.Label>Region</Form.Label>
                     <Form.Control ref={this.region} as="select">
@@ -75,26 +74,16 @@ export class Forms extends Component {
                 <Form.Control.Feedback type="invalid">Enter a valid Image ID</Form.Control.Feedback>
               </Form.Group>
               <Form.Group  md="4" controlId="validationtagKey">
-                <Form.Label>Tag Key</Form.Label>
+                <Form.Label>Instance Name</Form.Label>
                 <Form.Control
-                 ref={this.tagKey}
+                 ref={this.name}
                   required
                   type="text"
-                  placeholder="Tag Key"
+                  placeholder="Instance Name"
                 />
-                <Form.Control.Feedback type="invalid">Enter Tag Key</Form.Control.Feedback>
+                <Form.Control.Feedback type="invalid">Enter Instance Name</Form.Control.Feedback>
               </Form.Group>
-              <Form.Group  md="4" controlId="validationTagValue">
-                <Form.Label>Tag Value</Form.Label>
-                  <Form.Control
-                    ref={this.tagValue}
-                    type="text"
-                    placeholder="Tag Value"
-                    required
-                  />
-                  <Form.Control.Feedback type="invalid">Enter Tag Value</Form.Control.Feedback>
-              </Form.Group>
-            <Button type="submit">Create Instance</Button>
+            <Button type="button" onClick={(e) => this.handleSubmit(e)}>Create Instance</Button>
           </Form>
           </div>
         );
